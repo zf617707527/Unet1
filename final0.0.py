@@ -21,9 +21,9 @@ from keras import backend as K
 from skimage import io
 import h5py
 import SimpleITK as sitk
-TOTAL = 2782#训练集数目
-VAL_TOTAL = 78#测试集数目
-def getRangImageDepth(image):
+TOTAL = 600#训练集数目
+VAL_TOTAL = 35#测试集数目
+'''def getRangImageDepth(image):
     """
     args:
     image ndarray of shape (depth, height, weight)
@@ -31,14 +31,27 @@ def getRangImageDepth(image):
     firstflag = True
     startposition = 0
     endposition = 0
-    '''for z in range(image.shape[0]):
+    for z in range(image.shape[0]):
         notzeroflag = np.max(image[z])
         if notzeroflag and firstflag:
             startposition = z
             firstflag = False
         if notzeroflag:
-            endposition = z'''
+            endposition = z
     endposition = image.shape[0]-1
+    return startposition, endposition'''
+
+def getRangImageDepth(image):
+    firstflag = True
+    startposition = 0
+    endposition = 0
+    for z in range(image.shape[0]):
+        notzeroflag = np.max(image[z])
+        if notzeroflag and firstflag:
+            startposition = z
+            firstflag = False
+        if notzeroflag:
+            endposition = z
     return startposition, endposition
 
 class HDF5DatasetGenerator:
@@ -53,6 +66,10 @@ class HDF5DatasetGenerator:
 
         self.db = h5py.File(dbPath)
         self.numImages = self.db["images"].shape[0]
+        #print('&&&&&')
+        #print(self.db["images"].shape[0])
+        #print(self.db["images"].shape)
+        #        self.numImages = total
         print("total images:", self.numImages)
         self.num_batches_per_epoch = int((self.numImages - 1) / batchSize) + 1
 
@@ -69,6 +86,8 @@ class HDF5DatasetGenerator:
 
                 # h5py get item by index,参数为list，而且必须是增序
                 batch_indices = sorted(list(shuffle_indices[start_index:end_index]))
+                #print('******')
+                #print(batch_indices)
                 images = self.db["images"][batch_indices, :, :, :]
                 labels = self.db["masks"][batch_indices, :, :, :]
 
@@ -177,9 +196,19 @@ def transform_ctdata(self, windowWidth, windowCenter, normal=False):
         return: trucated image according to window center and window width
         """
         minWindow = float(windowCenter) - 0.5 * float(windowWidth)
+        print('<<<')
+        print(self)
         newimg = (self - minWindow) / float(windowWidth)
         newimg[newimg < 0] = 0
         newimg[newimg > 1] = 0
+        '''newimg = self.imag + 2000
+        newimg[newimg < -100] =0
+        newimg[newimg > 150] = 0
+
+        newimg = self.imag
+        newimg[newimg < -100] = 0
+        newimg[newimg > 150] = 0'''
+        #newimg[(newimg > -100) and (newimg < 150)] = 1
         if not normal:
             newimg = (newimg * 255).astype('uint8')
         return newimg
@@ -210,7 +239,7 @@ mask_datagen = ImageDataGenerator(**data_gen_args)
 dataset = HDF5DatasetWriter(image_dims=(TOTAL, 512, 512, 1),
                                 mask_dims=(TOTAL, 512, 512, 1),  # 这里的2782是图片的数目，这里我们要改的-- 103
                                 outputPath="train_liver.h5")  # 保存到文件中去
-for i in range(1, 5):  # 前4个人作为测试集
+for i in range(1, 10):  
     full_images = []  # 后面用来存储目标切片的列表
     full_livers = []  # 功能同上
     # 注意不同的系统，文件分割符的区别
@@ -238,7 +267,7 @@ for i in range(1, 5):  # 前4个人作为测试集
     #  接part1
     images = get_pixels_hu(image_slices)#对切片进行CT-HU值还原！（这个相当于是我们的直肠图）
 
-    images = transform_ctdata(images, 90, 25)#增强对比度的，这个可以保留
+    images = transform_ctdata(images,250, 75)#增强对比度的，这个可以保留  250 75
     start, end = getRangImageDepth(livers)#得到有肿瘤的图像
     print('(((')
     print(start,end)
@@ -258,7 +287,7 @@ for i in range(1, 5):  # 前4个人作为测试集
     images = images[start:end]
     print("%d person, images.shape:(%d,)" % (i, images.shape[0]))
 
-    livers[np.array(livers) > 0] = 1  #原来的值为1
+    livers[np.array(livers) > 0] = 1
     livers = livers[start:end]#为了与images匹配，所以进行了相同的切片操作！
     full_images.append(images)
     full_livers.append(livers)
@@ -317,7 +346,7 @@ for i in range(105,108):# 后1个人作为测试样本
     #  接part1
     images = get_pixels_hu(image_slices)  # 对切片进行CT-HU值还原！（这个相当于是我们的直肠图）
 
-    images = transform_ctdata(images, 90, 25)  # 增强对比度的，这个可以保留
+    images = transform_ctdata(images, 250, 75)  # 增强对比度的，这个可以保留
     start, end = getRangImageDepth(livers)
     print(')))')
     print(start,end)
@@ -480,73 +509,73 @@ class UnetModel:
         #fixed_test_images = ()
         #fixed_test_masks = ()
         #for i in test_iter:
-        for zf in range(int(VAL_TOTAL/BATCH_SIZE)+1):
+        #for zf in range(int(VAL_TOTAL/BATCH_SIZE)+1):
         #fixed_test_images=[]
         #fixed_test_masks=[]
         #zf=0
         #for i in range(int(23/BATCH_SIZE)+1):
-            fixed_test_images, fixed_test_masks = test_iter.__next__()
-            '''print('%%%%%')
-            print(fixed_test_imag)
-            fixed_test_images.append(fixed_test_imag)
-            fixed_test_masks.append(fixed_test_mask)'''
-            #fixed_test_images, fixed_test_masks = i
-            #fixed_test_images = fixed_test_images + i[0]
-            #fixed_test_masks = fixed_test_masks + i[1]
-            #print('!!!!!')
-            #print(i)
-            #print(type(i))
-            #test_iter.
-            #print('@@@@@@')
-            #print(fixed_test_images.shape)
-            #print(fixed_test_masks)
-            model = get_unet()
-            model_checkpoint = ModelCheckpoint('weights.h5', monitor='val_loss', save_best_only=True)
-            # 注：感觉validation的方式写的不对，应该不是这样弄的
-            model.fit_generator(train_iter, steps_per_epoch=1, verbose=1, epochs=1, shuffle=True,
-                                validation_data=(fixed_test_images, fixed_test_masks), callbacks=[model_checkpoint])
-            '''model.fit_generator(train_iter, steps_per_epoch=1, verbose=1, epochs=1, shuffle=True,
-                                validation_data= test_iter,validation_steps=23, callbacks=[model_checkpoint])'''
-            '''model.fit_generator(train_iter, steps_per_epoch=1, verbose=1, epochs=1, shuffle=True,
-                                validation_data=test_iter, callbacks=[model_checkpoint])'''
-            #reader.close()
-            #test_reader.close()
+        fixed_test_images, fixed_test_masks = test_iter.__next__()
+        '''print('%%%%%')
+        print(fixed_test_imag)
+        fixed_test_images.append(fixed_test_imag)
+        fixed_test_masks.append(fixed_test_mask)'''
+        #fixed_test_images, fixed_test_masks = i
+        #fixed_test_images = fixed_test_images + i[0]
+        #fixed_test_masks = fixed_test_masks + i[1]
+        #print('!!!!!')
+        #print(i)
+        #print(type(i))
+        #test_iter.
+        #print('@@@@@@')
+        #print(fixed_test_images.shape)
+        #print(fixed_test_masks)
+        model = get_unet()
+        model_checkpoint = ModelCheckpoint('weights.h5', monitor='val_loss', save_best_only=True)
+        # 注：感觉validation的方式写的不对，应该不是这样弄的
+        model.fit_generator(train_iter, steps_per_epoch=TOTAL/BATCH_SIZE, verbose=1, epochs=50, shuffle=True,
+                            validation_data=(fixed_test_images, fixed_test_masks), callbacks=[model_checkpoint])
+        '''model.fit_generator(train_iter, steps_per_epoch=1, verbose=1, epochs=1, shuffle=True,
+                            validation_data= test_iter,validation_steps=23, callbacks=[model_checkpoint])'''
+        '''model.fit_generator(train_iter, steps_per_epoch=1, verbose=1, epochs=1, shuffle=True,
+                            validation_data=test_iter, callbacks=[model_checkpoint])'''
+        #reader.close()
+        #test_reader.close()
 
-            print('-' * 30)
-            print('Loading and preprocessing test data...')
-            print('-' * 30)
+        print('-' * 30)
+        print('Loading and preprocessing test data...')
+        print('-' * 30)
 
-            print('-' * 30)
-            print('Loading saved weights...')
-            print('-' * 30)
-            model.load_weights('weights.h5')
+        print('-' * 30)
+        print('Loading saved weights...')
+        print('-' * 30)
+        model.load_weights('weights.h5')
 
-            print('-' * 30)
-            print('Predicting masks on test data...')
-            print('-' * 30)
-            #print(fixed_test_images.shape)
-            #imgs_mask_test = model.predict(fixed_test_images,steps=1, verbose=1)#此处加了steps=23
-            imgs_mask_test = model.predict(fixed_test_images, verbose=1)  # 此处加了steps=23
-            np.save('imgs_mask_test.npy', imgs_mask_test)
+        print('-' * 30)
+        print('Predicting masks on test data...')
+        print('-' * 30)
+        #print(fixed_test_images.shape)
+        #imgs_mask_test = model.predict(fixed_test_images,steps=1, verbose=1)#此处加了steps=23
+        imgs_mask_test = model.predict(fixed_test_images, verbose=1)  # 此处加了steps=23
+        np.save('imgs_mask_test.npy', imgs_mask_test)
 
-            print('-' * 30)
-            print('Saving predicted masks to files...')
-            print('-' * 30)
-            pred_dir = 'preds'
-            if not os.path.exists(pred_dir):
-                os.mkdir(pred_dir)
-            i = 0
-            print(imgs_mask_test.shape)
-            for image in imgs_mask_test:
-                image = (image[:, :, 0] * 255.).astype(np.uint8)
-                #gt = fixed_test_masks[0]
-                #print(gt)
-                gt = (fixed_test_masks[i, :, :, 0] * 255.).astype(np.uint8)
-                ini = (fixed_test_images[i, :, :, 0] * 255.).astype(np.uint8)
-                io.imsave(os.path.join(pred_dir, str(i+ zf*BATCH_SIZE) + '_ini.png'), ini)
-                io.imsave(os.path.join(pred_dir, str(i+ zf*BATCH_SIZE) + '_pred.png'), image)
-                io.imsave(os.path.join(pred_dir, str(i+ zf*BATCH_SIZE) + '_gt.png'), gt)
-                i += 1
+        print('-' * 30)
+        print('Saving predicted masks to files...')
+        print('-' * 30)
+        pred_dir = 'preds'
+        if not os.path.exists(pred_dir):
+            os.mkdir(pred_dir)
+        i = 0
+        print(imgs_mask_test.shape)
+        for image in imgs_mask_test:
+            image = (image[:, :, 0] * 255.).astype(np.uint8)
+            #gt = fixed_test_masks[0]
+            #print(gt)
+            gt = (fixed_test_masks[i, :, :, 0] * 255.).astype(np.uint8)
+            ini = (fixed_test_images[i, :, :, 0] * 255.).astype(np.uint8)
+            io.imsave(os.path.join(pred_dir, str(i) + '_ini.png'), ini)
+            io.imsave(os.path.join(pred_dir, str(i) + '_pred.png'), image)
+            io.imsave(os.path.join(pred_dir, str(i) + '_gt.png'), gt)
+            i += 1
         reader.close()
         test_reader.close()
 
