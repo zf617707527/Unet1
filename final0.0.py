@@ -346,7 +346,7 @@ for i in range(105,108):# 后1个人作为测试样本
     #  接part1
     images = get_pixels_hu(image_slices)  # 对切片进行CT-HU值还原！（这个相当于是我们的直肠图）
 
-    images = transform_ctdata(images, 250, 75)  # 增强对比度的，这个可以保留
+    images = transform_ctdata(images, 90, 25)  # 增强对比度的，这个可以保留
     start, end = getRangImageDepth(livers)
     print(')))')
     print(start,end)
